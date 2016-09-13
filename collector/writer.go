@@ -96,14 +96,12 @@ func (w CollectdWriter) writeDerived(s Stats) error {
 
 func (w CollectdWriter) writeInt(s Stats, k string, t int64, v uint64) error {
 	msg := fmt.Sprintf(collectdIntGaugeTemplate, w.host, s.Namespace, s.Pod, s.Container, k, t, v)
-	fmt.Println(msg)
 	_, err := w.writer.Write([]byte(msg))
 	return err
 }
 
 func (w CollectdWriter) writeFloat(s Stats, k string, t int64, v float64) error {
 	msg := fmt.Sprintf(collectdFloatPercentageTemplate, w.host, s.Namespace, s.Pod, s.Container, k, t, v)
-	fmt.Println(msg)
 	_, err := w.writer.Write([]byte(msg))
 	return err
 }
