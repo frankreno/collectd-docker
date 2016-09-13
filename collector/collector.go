@@ -3,7 +3,6 @@ package collector
 import (
 	"log"
 	"sync"
-
 	"github.com/fsouza/go-dockerclient"
 )
 
@@ -87,7 +86,7 @@ func (c *Collector) handle(id string) {
 
 		err := m.handle(c.ch)
 		if err != nil {
-			log.Printf("error handling container for app %s: %s\n", m.app, err)
+			log.Printf("error handling container for app %s: %s\n", m.container, err)
 		}
 
 		c.unregister(id)
