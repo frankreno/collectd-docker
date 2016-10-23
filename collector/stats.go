@@ -9,4 +9,6 @@ type Stats struct {
 	Container   string
 	Stats docker.Stats
 	PrevStats docker.Stats
+	cpuUpper 	int
+	cpuLower 	int
 }

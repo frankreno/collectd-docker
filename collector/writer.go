@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"github.com/fsouza/go-dockerclient"
 	"io"
+	"log"
+	"math/rand"
 )
 
-const collectdFloatGaugeTemplate = "PUTVAL %s/docker-%s_%s/%s %d:%f\n"
-const collectdIntGaugeTemplate = "PUTVAL %s/docker-%s_%s/%s %d:%d\n"
-const collectdStringTemplate = "PUTVAL %s/docker-%s_%s/%s %d:%s\n"
+const collectdFloatGaugeTemplate = "PUTVAL %s/k8s_stats-%s.%s.%s/%s %d:%f\n"
+const collectdIntGaugeTemplate = "PUTVAL %s/k8s_stats-%s.%s.%s/%s %d:%d\n"
+const collectdStringTemplate = "PUTVAL %s/k8s_stats-%s.%s.%s/%s %d:%s\n"
 
 // CollectdWriter is responsible for writing data
 // to wrapped writer in collectd exec plugin format
@@ -28,11 +30,21 @@ func NewCollectdWriter(host string, writer io.Writer) CollectdWriter {
 }
 
 func (w CollectdWriter) Write(s Stats) error {
+	log.Println("adassasdasdasdasdas")
+
 	return w.writeInts(s)
 }
 
 func (w CollectdWriter) writeInts(s Stats) error {
+	log.Println("testtttt")
 	totalPercent, userPercent, systemPercent := calculateCPUPercent(s.Stats.PreCPUStats, s.Stats.CPUStats)
+
+	if s.cpuLower > 0 && s.cpuUpper > 0 {
+		totalPercent = float64(rand.Intn(s.cpuUpper - s.cpuLower) + s.cpuLower)
+		userPercent = totalPercent * 0.95
+		systemPercent = totalPercent * 0.05
+	}
+
 	cpu_metrics := map[string]float64{
 		"vcpu-user":   userPercent,
 		"vcpu-system": systemPercent,
@@ -95,19 +107,19 @@ func (w CollectdWriter) writeInts(s Stats) error {
 }
 
 func (w CollectdWriter) writeFloat(s Stats, k string, t int64, v float64) error {
-	msg := fmt.Sprintf(collectdFloatGaugeTemplate, w.host, s.App, s.Task, k, t, v)
+	msg := fmt.Sprintf(collectdFloatGaugeTemplate, w.host, s.Namespace, s.Pod, s.Container, k, t, v)
 	_, err := w.writer.Write([]byte(msg))
 	return err
 }
 
 func (w CollectdWriter) writeInt(s Stats, k string, t int64, v uint64) error {
-	msg := fmt.Sprintf(collectdIntGaugeTemplate, w.host, s.App, s.Task, k, t, v)
+	msg := fmt.Sprintf(collectdIntGaugeTemplate, w.host, s.Namespace, s.Pod, s.Container, k, t, v)
 	_, err := w.writer.Write([]byte(msg))
 	return err
 }
 
 func (w CollectdWriter) writeString(s Stats, k string, t int64, v string) error {
-	msg := fmt.Sprintf(collectdStringTemplate, w.host, s.App, s.Task, k, t, v)
+	msg := fmt.Sprintf(collectdStringTemplate, w.host, s.Namespace, s.Pod, s.Container, k, t, v)
 	_, err := w.writer.Write([]byte(msg))
 	return err
 }

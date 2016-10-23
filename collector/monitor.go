@@ -4,13 +4,10 @@ import (
 	"errors"
 	"strings"
 	"github.com/fsouza/go-dockerclient"
+	"net"
+	"strconv"
+	"log"
 )
-
-
-var namespaceLabel = "io.kubernetes.pod.namespace"
-var podLabel = "io.kubernetes.pod.name"
-var containerNameLabel = "io.kubernetes.container.name"
-var containerHashLabel = "io.kubernetes.container.hash"
 
 
 // ErrNoNeedToMonitor is used to skip containers
@@ -32,6 +29,8 @@ type Monitor struct {
 	pod		string
 	container	string
 	interval 	int
+	cpuUpper 	int
+	cpuLower 	int
 	lastStats 	docker.Stats
 }
 
@@ -42,13 +41,30 @@ func NewMonitor(c MonitorDockerClient, id string, interval int) (*Monitor, error
 	if err != nil {
 		return nil, err
 	}
-	namespace := container.Config.Labels[namespaceLabel]
-	pod := container.Config.Labels[podLabel]
-	containerName := container.Config.Labels[containerNameLabel] + "-" + container.Config.Labels[containerHashLabel]
+
+	do_monitor := extractEnv(container, "COLLECTD_MONITOR")
+	if do_monitor != "true" {
+		return nil, ErrNoNeedToMonitor
+	}
+
+	namespace := container.Config.Labels["io.kubernetes.pod.namespace"]
+	pod := container.Config.Labels["io.kubernetes.pod.name"]
+	containerName := container.Config.Labels["io.kubernetes.container.name"]
+	cpuRange := extractEnv(container, "COLLECTD_CPU_RANGE")
+	cpuLower := -1
+	cpuUpper := -1
+
+	cpuLowerS, cpuUpperS, err := net.SplitHostPort(cpuRange)
+	if cpuLowerS != "" && cpuUpperS != "" {
+		cpuUpper, err = strconv.Atoi(cpuUpperS)
+		cpuLower, err = strconv.Atoi(cpuLowerS)
+	}
 
 	if namespace == "" || pod == "" || containerName == "" {
 		return nil, ErrNoNeedToMonitor
 	}
+
+	log.Printf("Monioring %d %s cpu %s:%s  =  %d:%d", interval, containerName, cpuLowerS, cpuUpperS, cpuLower, cpuUpper)
 
 	return &Monitor{
 		client:   c,
@@ -57,6 +73,8 @@ func NewMonitor(c MonitorDockerClient, id string, interval int) (*Monitor, error
 		pod: sanitizeForGraphite(pod),
 		container: sanitizeForGraphite(containerName),
 		interval: interval,
+		cpuLower: cpuLower,
+		cpuUpper: cpuUpper,
 	}, nil
 }
 
@@ -66,17 +84,22 @@ func (m *Monitor) handle(ch chan<- Stats) error {
 	go func() {
 		i := 0
 		for s := range in {
+			log.Println("ccccc")
+
 			if i%m.interval != 0 {
 				i++
 				continue
 			}
 
 			ch <- Stats{
+
 				Namespace: m.namespace,
 				Pod: m.pod,
 				Container:   m.container,
 				Stats: *s,
 				PrevStats: m.lastStats,
+				cpuUpper: m.cpuUpper,
+				cpuLower: m.cpuLower,
 			}
 
 			m.lastStats = *s
@@ -98,4 +121,15 @@ func sanitizeForGraphite(s string) string {
 
   // strip leading / and santize any other / for mesos ids  
   return strings.Replace(strings.TrimPrefix(r, "/"), "/", "_", -1)
+}
+
+
+func extractEnv(c *docker.Container, envPrefix string) string {
+	for _, e := range c.Config.Env {
+		if strings.HasPrefix(e, envPrefix) {
+			return strings.TrimPrefix(e, envPrefix + "=")
+		}
+	}
+
+	return ""
 }
