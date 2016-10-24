@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/fsouza/go-dockerclient"
 	"io"
-	"log"
 	"math/rand"
+	"time"
 )
 
 const collectdFloatGaugeTemplate = "PUTVAL %s/k8s_stats-%s.%s.%s/%s %d:%f\n"
@@ -30,17 +30,15 @@ func NewCollectdWriter(host string, writer io.Writer) CollectdWriter {
 }
 
 func (w CollectdWriter) Write(s Stats) error {
-	log.Println("adassasdasdasdasdas")
-
 	return w.writeInts(s)
 }
 
 func (w CollectdWriter) writeInts(s Stats) error {
-	log.Println("testtttt")
 	totalPercent, userPercent, systemPercent := calculateCPUPercent(s.Stats.PreCPUStats, s.Stats.CPUStats)
 
 	if s.cpuLower > 0 && s.cpuUpper > 0 {
-		totalPercent = float64(rand.Intn(s.cpuUpper - s.cpuLower) + s.cpuLower)
+		rand.Seed(time.Now().Unix())
+		totalPercent = float64(random(s.cpuLower, s.cpuUpper))
 		userPercent = totalPercent * 0.95
 		systemPercent = totalPercent * 0.05
 	}
@@ -148,4 +146,9 @@ func calculateCPUPercent(previous docker.CPUStats, current docker.CPUStats) (flo
 		}
 	}
 	return totalCpuPercent, userCpuPercent, systemCpuPercent
+}
+
+
+func random(min, max int) int {
+	return rand.Intn(max - min) + min
 }

@@ -75,8 +75,9 @@ func (c *Collector) handle(id string) {
 		}
 
 		log.Printf("error handling %s: %s\n", id, err)
-
 		return
+	} else {
+		log.Printf("Monioring %s: %s  (%d:%d)", m.container, id, m.cpuLower, m.cpuUpper)
 	}
 
 	go func() {
@@ -85,6 +86,7 @@ func (c *Collector) handle(id string) {
 		}
 
 		err := m.handle(c.ch)
+
 		if err != nil {
 			log.Printf("error handling container for app %s: %s\n", m.container, err)
 		}
@@ -94,6 +96,7 @@ func (c *Collector) handle(id string) {
 }
 
 func (c *Collector) register(id string) bool {
+
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 

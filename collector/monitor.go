@@ -6,7 +6,6 @@ import (
 	"github.com/fsouza/go-dockerclient"
 	"net"
 	"strconv"
-	"log"
 )
 
 
@@ -23,15 +22,15 @@ type MonitorDockerClient interface {
 
 // Monitor is responsible for monitoring of a single container (task)
 type Monitor struct {
-	client   	MonitorDockerClient
-	id       	string
-	namespace	string
-	pod		string
-	container	string
-	interval 	int
-	cpuUpper 	int
-	cpuLower 	int
-	lastStats 	docker.Stats
+	client    MonitorDockerClient
+	id        string
+	namespace string
+	pod       string
+	container string
+	interval  int
+	cpuUpper  int
+	cpuLower  int
+	lastStats docker.Stats
 }
 
 // NewMonitor creates new monitor with specified docker client,
@@ -42,8 +41,8 @@ func NewMonitor(c MonitorDockerClient, id string, interval int) (*Monitor, error
 		return nil, err
 	}
 
-	do_monitor := extractEnv(container, "COLLECTD_MONITOR")
-	if do_monitor != "true" {
+	monitor := extractEnv(container, "COLLECTD_MONITOR")
+	if monitor != "true" {
 		return nil, ErrNoNeedToMonitor
 	}
 
@@ -64,8 +63,6 @@ func NewMonitor(c MonitorDockerClient, id string, interval int) (*Monitor, error
 		return nil, ErrNoNeedToMonitor
 	}
 
-	log.Printf("Monioring %d %s cpu %s:%s  =  %d:%d", interval, containerName, cpuLowerS, cpuUpperS, cpuLower, cpuUpper)
-
 	return &Monitor{
 		client:   c,
 		id:       container.ID,
@@ -78,21 +75,18 @@ func NewMonitor(c MonitorDockerClient, id string, interval int) (*Monitor, error
 	}, nil
 }
 
-func (m *Monitor) handle(ch chan<- Stats) error {
+func (m *Monitor) handle(ch chan <- Stats) error {
 	in := make(chan *docker.Stats)
 
 	go func() {
 		i := 0
 		for s := range in {
-			log.Println("ccccc")
-
-			if i%m.interval != 0 {
+			if i % m.interval != 0 {
 				i++
 				continue
 			}
 
 			ch <- Stats{
-
 				Namespace: m.namespace,
 				Pod: m.pod,
 				Container:   m.container,
@@ -115,14 +109,12 @@ func (m *Monitor) handle(ch chan<- Stats) error {
 	})
 }
 
-
 func sanitizeForGraphite(s string) string {
 	r := strings.Replace(s, ".", "_", -1)
 
-  // strip leading / and santize any other / for mesos ids  
-  return strings.Replace(strings.TrimPrefix(r, "/"), "/", "_", -1)
+	// strip leading / and santize any other / for mesos ids
+	return strings.Replace(strings.TrimPrefix(r, "/"), "/", "_", -1)
 }
-
 
 func extractEnv(c *docker.Container, envPrefix string) string {
 	for _, e := range c.Config.Env {
